@@ -1,0 +1,56 @@
+﻿@page "/search/{SearchTerm}"
+@inject HttpClient Http
+@using BlazorBlog.Shared
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Search</li>
+    </ol>
+</nav>
+
+<h3 class="mt-5 mb-4" style="color:white;">Search results for "@SearchTerm"</h3>
+
+@if (_searchResults == null)
+{
+    <p>Loading search results...</p>
+}
+else
+{
+    @foreach (var post in _searchResults)
+    {
+        <div class="card my-4">
+            <div class="card-body">
+                <div class="container">
+                    <div class="row">
+                            <h5 class="card-title">@post.Title</h5>
+                            <p class="card-text"></p>
+                            <p class="card-text"><small class="text-muted">@post.DateCreated.ToLongDateString()</small></p>
+                            <a href="/posts/@post.Url" class="btn btn-primary">Read more...</a>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public string SearchTerm { get; set; } = default!;
+    private List<BlogPost> Posts = new List<BlogPost>();
+    private IEnumerable<BlogPost>? _searchResults; //sequence of elements of type blogposts
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Posts = await BlogService.GetBlogPosts();
+            _searchResults = Posts!.Where(x => x.Title.Contains(SearchTerm, StringComparison.CurrentCultureIgnoreCase)); //filters what is put into the search bar with all blogpost's titles.
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"There was a problem loading trail data: {ex.Message}");
+        }
+    }
+}

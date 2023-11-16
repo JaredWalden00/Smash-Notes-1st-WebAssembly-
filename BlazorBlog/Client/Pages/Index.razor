@@ -1,0 +1,194 @@
+﻿@page "/"
+@using BlazorBlog.Shared
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+@inject NavigationManager NavManager
+@using Markdig
+
+<style>
+    .card-link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+        .card-link .card {
+            transition: box-shadow 0.3s ease;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.3); /* Modify the values to adjust the box shadow */
+        }
+
+        .card-link:hover .card {
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Modify the values to adjust the box shadow */
+            text-decoration: none;
+        }
+
+    .charcard {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .charcard img {
+        margin-right: 10px;
+    }
+
+    .charcard:hover{
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Modify the values to adjust the box shadow */
+            text-decoration: none;
+            background-color: #FFFFFF;
+            transition: 0.2s;
+            cursor: pointer;
+    }
+
+    .charcard-text {
+        flex: 1; /* Allow the text to fill the remaining space */
+    }
+
+    .card-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 6; /* Set the number of lines to display before truncating */
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .card {
+        height: 200px; /* Set a fixed maximum height for the cards */
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .column {
+        overflow-y: auto;
+        max-height: 100%;
+    }
+    /* Custom CSS to ensure cards remain side by side on all devices */
+    .custom-card {
+        width: calc(100% / 6); /* Adjust the width to fit 6 cards in a row */
+        box-sizing: border-box;
+        padding: 5px;
+        display: flex;
+    }
+
+    .card:hover{
+            border: 2px solid red;
+            text-decoration: none;
+        cursor: pointer;
+    }
+
+    .container-fluid {
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-bottom: 0;
+        margin-top: 0;
+    }
+
+</style>
+
+<div class="container-fluid">
+    <div class="row mb-2" style="height: 90vh;">
+        <div class="col-sm-10 d-flex flex-column" style="height: 100%; background-image: url('928292.jpg'); background-size: cover; background-color:#E4E4E4;">
+            <div class="row flex-nowrap overflow-auto" style="background-color:dimgray;">
+                <div class="col-sm-12">
+                    <h5 style="color:white;">General</h5>
+                </div>
+            </div>
+            <div class="row" style="flex: 1; overflow-y: auto;">
+                @foreach (var post in AllPosts)
+                {
+                    <div class="custom-card" style="height: 35vh;">
+                        <div class="card shadow" style="height: 100%;" @onclick='() => NavManager.NavigateTo($"posts/{post.Url}")'>
+                            <img class="card-img-top">
+                            <div class="card-body" style="flex: 1; overflow: hidden;">
+                                <h5 class="card-title">@post.Title</h5>
+                                <h6 class="card-subtitle mb-3 text-muted">
+                                    <span>
+                                        @foreach (var character in post.Characters)
+                                        {
+                                            @if (post.Characters.IndexOf(character) == post.Characters.Count - 1)
+                                            {
+                                                @character.Name
+                                            }
+                                            else
+                                            {
+                                                @($"{character.Name}, ")
+                                            }
+                                        }
+                                    </span>
+                                </h6>
+                                    <div style="word-wrap: break-word;">
+                                        @((MarkupString)Markdown.ToHtml(@post.Content))
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+
+        </div>
+
+        <div class="col-sm-2" style="height: 100%; background-color:#484848; display: flex; flex-direction: column;">
+            <input type="text" @oninput="HandleSearchInput" placeholder="Search characters" style="max-height: 10%">
+            <div class="column" style="overflow-y: auto; flex-grow: 1;">
+                @foreach (var character in filteredCharacters)
+                {
+                    <a href="@character.Name/blogposts">
+                        <div class="charcard" style="background-color: #E4E4E4;">
+                            <img src="SmashIcons/@(character.Name).png" alt="Card Image">
+                            <div class="charcard-text">
+                                @character.Name
+                            </div>
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+
+
+    </div>
+</div>
+
+
+
+@code {
+    private List<BlogPost> AllPosts = new List<BlogPost>();
+    string placeholderImage = "https://via.placeholder.com/1060x180";
+    private string searchText = "";
+    private List<Character> Characters = new List<Character>();
+    private List<Character> postsCharacters = new List<Character>();
+    private List<Character> postCharacters = new List<Character>();
+
+    List<Character> filteredCharacters = new List<Character>();
+
+    private void HandleSearchInput(ChangeEventArgs e)
+    {
+        string searchInput = e.Value.ToString().ToLower();
+
+        if (!string.IsNullOrWhiteSpace(searchInput))
+        {
+            filteredCharacters = Characters.Where(character => character.Name.ToLower().Contains(searchInput)).ToList();
+        }
+        else
+        {
+            filteredCharacters = Characters;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AllPosts = await BlogService.GetBlogPosts();
+        Characters = await BlogService.GetAllCharacters();
+        filteredCharacters = Characters;
+        var characterTasks = AllPosts.Select(post => GetCharactersForPostAsync(post.Id));
+        var charactersResults = await Task.WhenAll(characterTasks); //waits until async charactertasks is done
+
+        for (int i = 0; i < AllPosts.Count; i++)
+        {
+            AllPosts[i].Characters = charactersResults[i];
+        }
+    }
+    private async Task<List<Character>> GetCharactersForPostAsync(int id)
+    {
+        return await BlogService.GetBlogPostCharactersById(id);
+    }
+}

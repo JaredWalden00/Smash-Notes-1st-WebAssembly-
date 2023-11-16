@@ -1,0 +1,56 @@
+﻿@using BlazorBlog.Shared
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+@page "/characters"
+@inject NavigationManager NavigationManager
+
+<style>
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+        gap: 1rem;
+    }
+
+    .card {
+        display: flex;
+        flex-direction: column;
+        background-color: gray;
+        cursor: pointer;
+    }
+
+    .card-text {
+        display: flex;
+        justify-content: center;
+    }
+</style>
+
+<div class="grid">
+    @foreach (var character in Characters){
+        <div class="card shadow" style="width: 6rem; height: fit-content" @onclick="() => HandleCardClick(character.Name)">
+        <img src="SmashIcons/@(character.Name).png" class="card-img-top" alt="@character.Name">
+            <div class="card-text" style="font-family: 'SFUI', sans-serif;">
+            <b>@character.Name</b>
+        </div>
+    </div>
+    }
+</div>
+
+@code {
+    //currently not in use
+    private List<BlogPost> Posts = new List<BlogPost>();
+    private List<Character> Characters = new List<Character>();
+    string placeholderImage = "https://via.placeholder.com/1060x180";
+
+    void HandleCardClick(string character)
+    {
+        // Construct the URL with the search term
+        var searchTerm = character.Replace(" ", "-");
+        // Navigate to the URL
+        NavigationManager.NavigateTo(searchTerm);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Posts = await BlogService.GetBlogPosts();
+        Characters = await BlogService.GetAllCharacters();
+    }
+}

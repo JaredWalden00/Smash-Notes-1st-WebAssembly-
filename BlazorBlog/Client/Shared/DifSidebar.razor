@@ -1,0 +1,81 @@
+﻿@inherits LayoutComponentBase
+@using BlazorBlog.Shared
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+@inject NavigationManager NavigationManager
+
+<RadzenLayout style="height: 100vh; width: 100vw; background-color:#353535;">
+    <RadzenHeader style="background-color:#5F5F5F">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0">
+            <RadzenSidebarToggle Click="@(() => sidebar1Expanded = !sidebar1Expanded)" />
+            <RadzenLabel Text="Smash Notes" />
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 100%; text-align: center;">
+                    <input @onkeydown="SearchForTrail"
+                    @bind="_searchTerm"
+                    @bind:event="oninput"
+                           type="text"
+                           placeholder="Search"
+                           style="margin: 0 auto; width:20%" 
+                           />
+                </div>
+            </div>
+        </RadzenStack>
+    </RadzenHeader>
+
+    <RadzenBody>
+            @Body
+    </RadzenBody>
+
+    <RadzenSidebar @bind-Expanded="@sidebar1Expanded" style="background-color:#5F5F5F">
+        <RadzenPanelMenu>
+
+            <RadzenPanelMenuItem Text="Home" Icon="home" Path=""></RadzenPanelMenuItem>
+            <RadzenPanelMenuItem Text="Create Note" Path="create" Icon="add"></RadzenPanelMenuItem>
+            <RadzenPanelMenuItem Text="Recent Posts" Icon="chat">
+                @foreach (var post in Posts)
+                {
+                    <RadzenPanelMenuItem Text="@post.Title" Icon="Dialog" Path="@($"/posts/{post.Url}")" Click="@(() => OnSelected.InvokeAsync(post))"></RadzenPanelMenuItem>
+                }
+
+            </RadzenPanelMenuItem>
+        </RadzenPanelMenu>
+    </RadzenSidebar>
+</RadzenLayout>
+
+@code {
+    bool sidebar1Expanded = true;
+    private List<BlogPost> Posts = new List<BlogPost>();
+    [Parameter, EditorRequired] public EventCallback<BlogPost> OnSelected { get; set; }
+
+    private string _searchTerm = "";
+
+    private void SearchForTrail(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter") return;
+
+        NavigationManager.NavigateTo($"/search/{_searchTerm}");
+
+        _searchTerm = "";
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPosts();
+        BlogService.BlogPostCreated += OnMenuSwitch;
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+
+    private async Task OnMenuSwitch()
+    {
+        Posts = await BlogService.GetBlogPosts();
+    }
+
+    private async Task LoadPosts()
+    {
+        Posts = await BlogService.GetBlogPosts();
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,87 @@
+﻿@page "/create"
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+@using BlazorBlog.Shared
+@inject NavigationManager NavigationManager
+@using Radzen.Blazor.Rendering
+@using System.Text
+@inherits RadzenHtmlEditorButtonBase
+@inject DialogService DialogService
+@using Blazorise.Components
+@inject HttpClient httpClient
+
+<div class="container-fluid">
+<EditForm Model="@newBlogPost" OnValidSubmit="CreateNewBlogPost">
+    <DataAnnotationsValidator />
+    <div class="row">
+            <div class="col-6" style="height: 10vh;">
+                <div class="form-group">
+                    <label for="title" style="color:white;">Title</label>
+                    <InputText id="title" @bind-Value="newBlogPost.Title" class="form-control" />
+                    <ValidationMessage For="@(() => newBlogPost.Title)" />
+                </div>
+            </div>
+            <div class="col-5" style="height: 10vh;">
+                <div class="form-group">
+                    <label for="character" style="color:white;">Character</label>
+                    <Autocomplete TItem="Character"
+                                  TValue="int"
+                                  Data="@Characters"
+                                  TextField="@((Character character) => character.Name)"
+                                  ValueField="@((Character character) => character.Id)"
+                                  Placeholder="Select a character"
+                                  style="background-color:white;"
+                                  SelectionMode="AutocompleteSelectionMode.Multiple"
+                    @bind-SelectedValues="CharacterIds">
+                    </Autocomplete>
+                </div>
+
+            </div>
+            <div class="col-1" style="height: 10vh; display: flex; align-items: center; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+    </div>
+        <div class="row">
+            <div class="col-12" style="height: 80vh;">
+                <RadzenHtmlEditor @bind-Value=newBlogPost.Content UploadUrl="upload/image" style="height: 100%;" />
+            </div>
+        </div>
+    <ValidationSummary />
+</EditForm>
+</div>
+<RadzenDialog />
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+@code {
+    BlazorBlog.Shared.BlogPost newBlogPost = new BlazorBlog.Shared.BlogPost();
+    private List<Character> Characters = new List<Character>();
+
+    List<string> characterspicked;
+    [Parameter]
+    public List<int> CharacterIds { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Characters = await BlogService.GetAllCharacters();
+    }
+
+    protected override void OnInitialized()
+    {
+        if (string.IsNullOrEmpty(newBlogPost.Title))
+        {
+            newBlogPost.Title = "Untitled";
+        }
+
+    }
+
+    async Task CreateNewBlogPost()
+    {
+        string dashsepchars = string.Join("-", CharacterIds);
+        newBlogPost.Url = $"{newBlogPost.Title.Replace(" ", "-")}-{dashsepchars}";
+        await BlogService.CreateNewBlogPost(newBlogPost);
+        await BlogService.AddBlogPostCharacter(newBlogPost.Url, CharacterIds);
+        NavigationManager.NavigateTo($"posts/{newBlogPost.Url}");
+    }
+
+}

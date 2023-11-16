@@ -1,0 +1,237 @@
+﻿@page "/posts/{url}"
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+@using Markdig
+@inject NavigationManager NavigationManager
+@using BlazorBlog.Shared
+
+<style>
+    .form-group-container {
+        background-color: #f0f0f0; /* Replace with your desired background color */
+        padding: 10px; /* Adjust padding as needed */
+        border-radius: 5px; /* Add border radius if desired */
+    }
+
+</style>
+
+@if (CurrentPost == null)
+{
+    <span>Getting that blog post from the service...</span>
+}
+else
+{
+
+    @if (!EditRecord)
+    {
+        <div class="container-fluid">
+            <div class="row" style="padding: 0 10px; background-color: #DFDFDF;">
+                <div class="col-10">
+                    <h2>@CurrentPost.Title</h2>
+                </div>
+                <div class="col-1" style="align-items: center; justify-content: flex-end; margin-top: 10px;">
+                    <button type="button" class="btn btn-primary" @onclick="EditBlog">Edit blog</button>
+                </div>
+                <div class="col-1" style="align-items: center; justify-content: flex-end; margin-top: 10px;">
+                    <button type="button" class="btn btn-danger ml-2" @onclick="DeleteBlogPost">Delete</button>
+                </div>
+
+            </div>
+
+            <div class="row" style="padding: 0 10px; background-color: #DFDFDF;">
+                <div class="col-12">
+                    <h5>
+                        @if (ExistingCharacters != null)
+                        {
+                            @foreach (var character in ExistingCharacters)
+                            {
+                                @if (ExistingCharacters.IndexOf(character) == ExistingCharacters.Count - 1)
+                                {
+                                    @character.Name
+                                }
+                                else
+                                {
+                                    @($"{character.Name}, ")
+                                }
+                            }
+                        }
+                    </h5>
+
+                </div>
+            </div>
+
+
+
+        <div class="row">
+                <div class="col-12" style="height: 80vh; background-color:white; overflow-y: auto;">
+                    <div style="word-wrap: break-word;">
+                        @((MarkupString)Markdown.ToHtml(@CurrentPost.Content))
+                    </div>
+            </div>
+        </div>
+        </div>
+    }
+    else
+    {
+            <EditForm Model="@CurrentPost" OnSubmit="SaveBlog">
+                <DataAnnotationsValidator />
+                <div class="row">
+                    <div class="col-6" style="height: 10vh;">
+                        <div class="form-group">
+                            <label for="title">Title</label>
+                            <InputText id="title" @bind-Value="CurrentPost.Title" class="form-control" />
+                            <ValidationMessage For="@(() => CurrentPost.Title)" />
+                        </div>
+                    </div>
+                    <div class="col-4" style="height: 10vh;">
+                        <div class="form-group">
+                            <label for="character">Character</label>
+                            <Autocomplete TItem="Character"
+                                          TValue="int"
+                                          Data="@Characters"
+                                          TextField="@((Character character) => character.Name)"
+                                          ValueField="@((Character character) => character.Id)"
+                                          Placeholder="Select a character"
+                                          style="background-color:white;"
+                                          SelectionMode="AutocompleteSelectionMode.Multiple"
+                            @bind-SelectedValues="NewCharacterIds">
+                            </Autocomplete>
+                        </div>
+
+                    </div>
+                <div class="col-2" style="height: 10vh; display: flex; align-items: center; justify-content: flex-end;">
+                    <button type="submit" class="btn btn-primary" style="margin-right: 10px;">Update</button>
+                    <button class="btn btn-primary" onclick="CancelEdit()">Cancel</button>
+                </div>
+
+                </div>
+                <div class="row">
+                    <div class="col-12" style="height: 80vh;">
+                        <RadzenHtmlEditor @bind-Value=CurrentPost.Content UploadUrl="upload/image" style="height: 100%;" />
+                    </div>
+                </div>
+                <ValidationSummary />
+            </EditForm>
+        <RadzenDialog />
+        <RadzenNotification />
+        <RadzenContextMenu />
+            <RadzenTooltip />
+    }
+}
+
+@code {
+    private BlazorBlog.Shared.BlogPost CurrentPost;
+
+    [Parameter]
+    public string Url { get; set; }
+
+    private List<Character> Characters = new List<Character>();
+    private List<Character> ExistingCharacters = new List<Character>();
+
+    public bool EditRecord = false;
+    [Parameter]
+    public List<int> NewCharacterIds { get; set; }
+
+    [Parameter]
+    public List<int> ExistingCharacterIds { get; set; }
+
+    [Parameter]
+    public List<int> commonIds { get; set; }
+
+    [Parameter]
+    public List<int> extraIds { get; set; }
+
+    string placeholderImage = "https://via.placeholder.com/1060x300";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CurrentPost = await BlogService.GetBlogPostByUrl(Url);
+        ExistingCharacters = await BlogService.GetBlogPostCharactersById(CurrentPost.Id);
+        Characters = await BlogService.GetAllCharacters();
+        ExistingCharacterIds = new List<int>();
+
+        foreach (var character in ExistingCharacters)
+        {
+            ExistingCharacterIds.Add(character.Id);
+        }
+    }
+
+    public async Task EditBlog()
+    {
+        NewCharacterIds = ExistingCharacterIds;
+        EditRecord = true;
+    }
+
+    public async Task SaveBlog()
+    {
+        await BlogService.DeleteBlogPostCharacters(CurrentPost.Id, ExistingCharacterIds);
+        await BlogService.AddBlogPostCharacter(CurrentPost.Url, NewCharacterIds);
+        await BlogService.UpdateBlogPost(CurrentPost);
+        ExistingCharacterIds = NewCharacterIds;
+        ExistingCharacters = await BlogService.GetBlogPostCharactersById(CurrentPost.Id);
+        EditRecord = false;
+        StateHasChanged(); // Manually trigger re-render
+    }
+
+
+    public async Task CancelEdit()
+    {
+        EditRecord = false;
+    }
+
+    async Task DeleteBlogPost()
+    {
+        if (CurrentPost.Id != 0)
+        {
+            await BlogService.DeleteBlogPost(CurrentPost.Id);
+            NavigationManager.NavigateTo("");
+        }
+    }
+
+   /* public async Task CompareAndSeparate()
+    {
+        commonIds = NewCharacterIds.Intersect(ExistingCharacterIds).ToList();
+        if (!commonIds.Any()) //if completely changed
+        {
+            await BlogService.DeleteBlogPostCharacters(CurrentPost.Id, ExistingCharacterIds);
+            await BlogService.AddBlogPostCharacter(CurrentPost.Url, NewCharacterIds);
+        }
+        else if (commonIds.Count < NewCharacterIds.Count && commonIds.Count < ExistingCharacterIds.Count)
+        {
+            //If there are some common elements between the lists, but the number of common elements is fewer than the total number of NewCharacterIds or ExistingCharacterIds, you can use the common elements, along with the extra elements from NewCharacterIds that are not present in ExistingCharacterIds
+            extraIds = NewCharacterIds.Except(ExistingCharacterIds).ToList();
+
+            await BlogService.DeleteBlogPostCharacters(CurrentPost.Id, ExistingCharacterIds);
+            await BlogService.AddBlogPostCharacter(CurrentPost.Url, commonIds.Concat(extraIds).ToList());
+        }
+        else if (commonIds.Count < NewCharacterIds.Count && commonIds.Count >= ExistingCharacterIds.Count)
+        {
+            //If there are some common elements between the lists, but the number of common elements is fewer than the total number of NewCharacterIds or ExistingCharacterIds, you can use the common elements, along with the extra elements from ExistingCharacterIds that are not present in NewCharacterIds
+            extraIds = ExistingCharacterIds.Union(NewCharacterIds)
+                                        .Except(ExistingCharacterIds.Intersect(NewCharacterIds))
+                                        .Distinct()
+                                        .ToList();
+
+            await BlogService.AddBlogPostCharacter(CurrentPost.Url, extraIds);
+        }
+        else if (commonIds.Count == NewCharacterIds.Count && commonIds.Count < ExistingCharacterIds.Count)
+        {
+            extraIds = NewCharacterIds.Union(ExistingCharacterIds)
+                                        .Except(NewCharacterIds.Intersect(ExistingCharacterIds))
+                                        .Distinct()
+                                        .ToList();
+
+            await BlogService.DeleteBlogPostCharacters(CurrentPost.Id, ExistingCharacterIds);
+            await BlogService.AddBlogPostCharacter(CurrentPost.Url, commonIds.Concat(extraIds).ToList());
+        }
+        else if (commonIds.Count >= NewCharacterIds.Count && commonIds.Count < ExistingCharacterIds.Count)
+        {
+            // Case: Partial Overlap - More Similar Values
+            // Use commonIds and extra elements from ExistingCharacterIds
+            extraIds = ExistingCharacterIds.Except(NewCharacterIds).ToList();
+
+            await BlogService.DeleteBlogPostCharacters(CurrentPost.Id, commonIds);
+            await BlogService.AddBlogPostCharacter(CurrentPost.Url, commonIds.Concat(extraIds).ToList());
+        }
+    }
+    */
+
+}

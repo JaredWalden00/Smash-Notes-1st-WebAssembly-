@@ -1,0 +1,86 @@
+﻿@using BlazorBlog.Shared
+@inject BlazorBlog.Client.Services.IBlogService BlogService
+@inject NavigationManager NavigationManager
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">BlazorApp1</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+            <div style="width: 100%; text-align: center;">
+                <input @onkeydown="SearchForTrail"
+                @bind="_searchTerm"
+                @bind:event="oninput"
+                       type="text"
+                       placeholder="Search"
+                       style="margin: 0 auto; width:20%" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <RadzenPanelMenu>
+
+            <RadzenPanelMenuItem Text="Home" Icon="home" Path=""></RadzenPanelMenuItem>
+            <RadzenPanelMenuItem Text="Create Note" Path="create" Icon="add"></RadzenPanelMenuItem>
+            <RadzenPanelMenuItem Text="Create Vod Review" Path="createvodreview" Icon="add"></RadzenPanelMenuItem>
+            <RadzenPanelMenuItem Text="Recent Posts" Icon="chat">
+                @foreach (var post in Posts)
+                {
+                    <RadzenPanelMenuItem Text="@post.Title" Icon="Dialog" Path="@($"/posts/{post.Url}")" Click="@(() => OnSelected.InvokeAsync(post))"></RadzenPanelMenuItem>
+                }
+
+            </RadzenPanelMenuItem>
+        </RadzenPanelMenu>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    bool sidebar1Expanded = true;
+    private List<BlogPost> Posts = new List<BlogPost>();
+    [Parameter, EditorRequired] public EventCallback<BlogPost> OnSelected { get; set; }
+
+    private string _searchTerm = "";
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void SearchForTrail(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter") return;
+
+        NavigationManager.NavigateTo($"/search/{_searchTerm}");
+
+        _searchTerm = "";
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPosts();
+        BlogService.BlogPostCreated += OnMenuSwitch;
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+
+    private async Task OnMenuSwitch()
+    {
+        Posts = await BlogService.GetBlogPosts();
+    }
+
+    private async Task LoadPosts()
+    {
+        Posts = await BlogService.GetBlogPosts();
+        StateHasChanged();
+    }
+}
